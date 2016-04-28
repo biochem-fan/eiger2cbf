@@ -1,6 +1,7 @@
 /*
 EIGER HDF5 to CBF converter
  Written by Takanori Nakane
+ (APPLY_FLATFILED_CORRECTION by Keitaro Yamashita)
 
 To build:
 
@@ -42,6 +43,8 @@ gcc -std=c99 -o eiger2cbf -g \
 #include "hdf5.h"
 #include "hdf5_hl.h"
 
+// Comment out this line to skip flatfield correction.
+#define APPLY_FLATFILED_CORRECTION
 
 extern const H5Z_class2_t H5Z_LZ4;
 extern const H5Z_class2_t bshuf_H5Filter;
@@ -231,6 +234,14 @@ int main(int argc, char **argv) {
   unsigned int *buf = (unsigned int*)malloc(sizeof(unsigned int) * xpixels * ypixels);
   signed int *buf_signed = (signed int*)malloc(sizeof(signed int) * xpixels * ypixels);
   signed int *pixel_mask = (signed int*)malloc(sizeof(signed int) * xpixels * ypixels);
+#ifdef APPLY_FLATFILED_CORRECTION
+  float *flatfield = (float*)malloc(sizeof(float) * xpixels * ypixels);
+  int flatfield_correction_applied;
+  if (flatfield == NULL) {
+    fprintf(stderr, "Failed to allocate flatfield.\n");
+    return -1;
+  }
+#endif
   if (buf == NULL || buf_signed == NULL || pixel_mask == NULL) {
     fprintf(stderr, "Failed to allocate image buffer.\n");
     return -1;
@@ -262,7 +273,25 @@ int main(int argc, char **argv) {
     fprintf(stderr, " Thus, we mask pixels whose intensity is %u (= (2 ^ bit_depth_image) - 1) by converting them to -1. \n", error_val);
     fprintf(stderr, " However, this might mask overloaded (saturated) pixels as well.\n");
   }
-  
+
+#ifdef APPLY_FLATFILED_CORRECTION
+  H5LTread_dataset_int(hdf, "/entry/instrument/detector/flatfield_correction_applied", &flatfield_correction_applied);
+  if (flatfield_correction_applied == 1)
+    fprintf(stderr, "/entry/instrument/detector/flatfield_correction_applied is 1! skipping flatfiled correction");
+  else if (flatfield_correction_applied == 0) {
+    flatfield[0] = 100.;
+    H5LTread_dataset_float(hdf, "/entry/instrument/detector/detectorSpecific/flatfield", flatfield);
+    if (flatfield[0] == 100.) {
+      fprintf(stderr, "WARNING: failed to read the flatfield from /entry/instrument/detector/detectorSpecific/flatfield.\n");
+      return -1;
+    }
+  }
+  else {
+    fprintf(stderr, "/entry/instrument/detector/flatfield_correction_applied is neither 0 or 1!");
+    return -1;
+  }
+#endif
+
   // Check if /entry/data present
   group = H5Gopen2(entry, "data", H5P_DEFAULT);  
   if (group < 0) {
@@ -430,7 +459,11 @@ int main(int argc, char **argv) {
       } else if (pixel_mask[0] != -9999 && pixel_mask[i] > 1) { // the pixel mask is 2, 4, 8, 16
 	buf_signed[i] = -2;
       } else {
+#ifdef APPLY_FLATFILED_CORRECTION
+	buf_signed[i] = flatfield_correction_applied == 0 ? buf[i] * flatfield[i] + 0.5 : buf[i];
+#else
 	buf_signed[i] = buf[i];
+#endif
       }
     }
     cbf_set_integerarray_wdims_fs(cbf,
