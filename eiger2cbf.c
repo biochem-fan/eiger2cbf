@@ -249,7 +249,8 @@ int main(int argc, char **argv) {
 
   // TODO: Is it always in omega?
   int bufsize = (nimages < 100000) ? 100000 : nimages;
-  double *angles = (double*)malloc(100000);
+  double *angles = (double*)malloc(bufsize * sizeof(double));
+
   // I don't know why but nimages can be too small ...
   if (angles == NULL) {
     fprintf(stderr, "failed to allocate buffer for omega.\n");
@@ -455,7 +456,8 @@ int main(int argc, char **argv) {
     int i;
     for (i = 0; i < xpixels * ypixels; i++) {
       if ((pixel_mask[0] != -9999 && pixel_mask[i] == 1) || // the pixel mask is available
-	  (pixel_mask[0] == -9999 && buf[i] == error_val)) { // not available
+	  //(pixel_mask[0] == -9999 && buf[i] == error_val)) { // not available
+	  (buf[i] == error_val)) { // not available
 	buf_signed[i] = -1;
       } else if (pixel_mask[0] != -9999 && pixel_mask[i] > 1) { // the pixel mask is 2, 4, 8, 16
 	buf_signed[i] = -2;
