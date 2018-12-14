@@ -7,6 +7,9 @@ to be used with MOSFLM. You do *not* need this program to process images
 with [DIALS](http://dials.diamond.ac.uk/); DIALS can process HDF5 images 
 directly (DIALS 1.2.0, which comes with CCP4 7.0.13).
 
+*NOTE:* As of late 2018, MOSFLM no longer needs conversion to CBF (see https://www.mrc-lmb.cam.ac.uk/harry/mosflm-hdf5/).
+eiger2cbf does not support NeXus files from Diamond Light Source, while the above mentioned version of MOSFLM supports it.
+
 Installation
 ------------
 
